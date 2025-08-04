@@ -61,8 +61,41 @@
                            completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
                                if (completedBlock) {
                                    completedBlock(image, error, cacheType, imageURL);
+                               }else{
+                                   if (error != nil) {
+                                       [self sd_retry_setImageWithURL:url retryTime:5 placeholderImage:placeholder options:options context:context progress:progressBlock completed:completedBlock];
+                                   }
                                }
                            }];
+}
+
+- (void)sd_retry_setImageWithURL:(nullable NSURL *)url
+                       retryTime:(NSInteger)time
+                placeholderImage:(nullable UIImage *)placeholder
+                         options:(SDWebImageOptions)options
+                         context:(nullable SDWebImageContext *)context
+                        progress:(nullable SDImageLoaderProgressBlock)progressBlock
+                       completed:(nullable SDExternalCompletionBlock)completedBlock {
+    [self sd_internalSetImageWithURL:url
+                    placeholderImage:placeholder
+                             options:options
+                             context:context
+                       setImageBlock:nil
+                            progress:progressBlock
+                           completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
+        if (completedBlock) {
+            completedBlock(image, error, cacheType, imageURL);
+        }else{
+            if (error != nil) {
+                if (time >= 60 * 60 * 24) {
+                    return;
+                }
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(time * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [self sd_retry_setImageWithURL:url retryTime:time * 2 placeholderImage:placeholder options:options context:context progress:progressBlock completed:completedBlock];
+                });
+            }
+        }
+    }];
 }
 
 #pragma mark - State
